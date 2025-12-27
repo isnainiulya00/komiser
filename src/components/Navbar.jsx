@@ -1,19 +1,32 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 const Navbar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user'));
+    } catch {
+      return null;
+    }
+  });
   
-  // 1. Cek apakah ada data user di memori browser (LocalStorage)
-  // Kalau ada, berarti user sedang Login.
-  const user = JSON.parse(localStorage.getItem('user'));
+  // Update user state when route changes or on mount
+  useEffect(() => {
+    try {
+      setUser(JSON.parse(localStorage.getItem('user')));
+    } catch {
+      setUser(null);
+    }
+  }, [location.pathname]);
 
   // 2. Fungsi untuk Logout
   const handleLogout = () => {
     localStorage.removeItem('user'); // Hapus data user
+    setUser(null); // Update state
     alert("Anda telah keluar.");
     navigate('/login'); // Pindah ke halaman login
-    window.location.reload(); // Refresh halaman agar tampilan Navbar berubah
   };
 
   return (

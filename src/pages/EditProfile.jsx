@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { FaUpload, FaTrash } from 'react-icons/fa';
 
 const EditProfile = () => {
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem('user') || 'null');
+  
+  // Ref untuk pemicu klik upload file
+  const coverPhotoInputRef = useRef(null);
+  const profilePhotoInputRef = useRef(null);
+
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
   const [formData, setFormData] = useState({
     name: '',
     role: '',
@@ -31,20 +36,12 @@ const EditProfile = () => {
       return;
     }
 
-    // Load existing profile
     const creators = JSON.parse(localStorage.getItem('creators') || '[]');
     const existingProfile = creators.find(c => c.email === user.email);
     
     if (existingProfile) {
       setFormData({
-        name: existingProfile.name || user.name,
-        role: existingProfile.role || '',
-        bio: existingProfile.bio || '',
-        category: existingProfile.category || '',
-        skills: existingProfile.skills || [],
-        portfolio: existingProfile.portfolio || [],
-        profilePhoto: existingProfile.profilePhoto || null,
-        coverPhoto: existingProfile.coverPhoto || null,
+        ...existingProfile,
         social: existingProfile.social || { instagram: '', twitter: '', behance: '' }
       });
     } else {
@@ -52,6 +49,7 @@ const EditProfile = () => {
     }
   }, [user, navigate]);
 
+  // Handle input teks dan select
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     if (name.startsWith('social.')) {
@@ -77,6 +75,10 @@ const EditProfile = () => {
   const handleImageUpload = (type, e) => {
     const file = e.target.files[0];
     if (file) {
+      if (file.size > 1500000) { // Limit ~1.5MB agar localStorage tidak penuh
+        alert("Ukuran file terlalu besar, pilih gambar di bawah 1.5MB");
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, [type]: reader.result }));
@@ -85,322 +87,133 @@ const EditProfile = () => {
     }
   };
 
-  const handlePortfolioAdd = () => {
-    const title = prompt('Judul portfolio:');
-    if (title) {
-      setFormData(prev => ({
-        ...prev,
-        portfolio: [...prev.portfolio, { id: Date.now(), title, image: null }]
-      }));
-    }
-  };
-
-  const handlePortfolioImageUpload = (portfolioId, e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({
-          ...prev,
-          portfolio: prev.portfolio.map(p => 
-            p.id === portfolioId ? { ...p, image: reader.result } : p
-          )
-        }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handlePortfolioDelete = (portfolioId) => {
-    setFormData(prev => ({
-      ...prev,
-      portfolio: prev.portfolio.filter(p => p.id !== portfolioId)
-    }));
-  };
-
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Validasi
-    if (!formData.name || !formData.role || !formData.category) {
-      alert('Harap isi semua field yang wajib (Nama, Role, Kategori)!');
+    if (!formData.name.trim() || !formData.role.trim() || !formData.category) {
+      alert('Nama, Role, dan Kategori wajib diisi!');
       return;
     }
     
-    const creators = JSON.parse(localStorage.getItem('creators') || '[]');
-    const existingIndex = creators.findIndex(c => c.email === user.email);
-    
-    // Hitung rating dari reviews
-    const existingId = existingIndex >= 0 ? creators[existingIndex].id : Date.now();
-    const reviews = JSON.parse(localStorage.getItem('reviews') || '[]');
-    const creatorReviews = reviews.filter(r => r.creatorId === existingId);
-    const avgRating = creatorReviews.length > 0 
-      ? creatorReviews.reduce((sum, r) => sum + r.rating, 0) / creatorReviews.length 
-      : 0;
-    
-    const creatorData = {
-      id: existingId,
-      email: user.email,
-      name: formData.name.trim(),
-      role: formData.role.trim(),
-      bio: formData.bio.trim() || '',
-      category: formData.category,
-      skills: formData.skills || [],
-      portfolio: formData.portfolio || [],
-      profilePhoto: formData.profilePhoto || null,
-      coverPhoto: formData.coverPhoto || null,
-      social: formData.social || { instagram: '', twitter: '', behance: '' },
-      rating: parseFloat(avgRating.toFixed(1)),
-      reviews: creatorReviews.length,
-      approved: existingIndex >= 0 ? creators[existingIndex].approved : false // Tetap pertahankan status approved
-    };
+    try {
+      const creators = JSON.parse(localStorage.getItem('creators') || '[]');
+      const existingIndex = creators.findIndex(c => c.email === user.email);
+      
+      const creatorData = {
+        ...formData,
+        id: existingIndex >= 0 ? creators[existingIndex].id : Date.now(),
+        email: user.email,
+        approved: existingIndex >= 0 ? creators[existingIndex].approved : false
+      };
 
-    if (existingIndex >= 0) {
-      creators[existingIndex] = creatorData;
-    } else {
-      creators.push(creatorData);
+      if (existingIndex >= 0) {
+        creators[existingIndex] = creatorData;
+      } else {
+        creators.push(creatorData);
+      }
+
+      localStorage.setItem('creators', JSON.stringify(creators));
+      alert('Profil berhasil disimpan!');
+      navigate('/dashboard');
+    } catch (error) {
+      alert('Gagal menyimpan! Pastikan ukuran foto tidak terlalu besar.');
     }
-
-    localStorage.setItem('creators', JSON.stringify(creators));
-    alert('Profil berhasil disimpan!');
-    navigate('/dashboard');
-    window.location.reload(); // Reload untuk update data
   };
 
-  if (!user || user.role !== 'Artist') return null;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gray-50">
       <Navbar />
       
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Edit Profil</h1>
-          <p className="text-gray-600">Kelola profil dan portfolio Anda</p>
-        </div>
-
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Cover Photo */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
+          
+          {/* Cover Photo - Area ini sekarang bisa diklik tanpa macet */}
+          <div className="bg-white rounded-2xl shadow-md p-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">Foto Cover</label>
-            <div className="h-48 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl relative overflow-hidden">
-              {formData.coverPhoto && (
+            <div 
+              className="h-48 bg-blue-100 rounded-xl relative overflow-hidden cursor-pointer group flex items-center justify-center"
+              onClick={() => coverPhotoInputRef.current.click()}
+            >
+              {formData.coverPhoto ? (
                 <img src={formData.coverPhoto} alt="Cover" className="w-full h-full object-cover" />
+              ) : (
+                <div className="text-blue-400 flex flex-col items-center">
+                   <FaUpload size={30} />
+                   <span className="text-sm mt-2">Klik untuk upload cover</span>
+                </div>
               )}
-              <label className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-50 transition cursor-pointer z-10" style={{ pointerEvents: 'auto' }}>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleImageUpload('coverPhoto', e)}
-                  className="hidden"
-                />
-                <FaUpload className="text-white text-2xl" style={{ pointerEvents: 'none' }} />
-              </label>
+              <input 
+                type="file" ref={coverPhotoInputRef} className="hidden" 
+                accept="image/*" onChange={(e) => handleImageUpload('coverPhoto', e)} 
+              />
             </div>
           </div>
 
           {/* Profile Photo */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Foto Profil</label>
+          <div className="bg-white rounded-2xl shadow-md p-6">
             <div className="flex items-center gap-6">
-              <div className="w-32 h-32 bg-gray-200 rounded-full relative overflow-hidden">
+              <div 
+                className="w-32 h-32 bg-gray-200 rounded-full relative overflow-hidden cursor-pointer flex items-center justify-center border-4 border-white shadow-inner"
+                onClick={() => profilePhotoInputRef.current.click()}
+              >
                 {formData.profilePhoto ? (
                   <img src={formData.profilePhoto} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-4xl font-bold text-gray-400">
-                    {formData.name.charAt(0).toUpperCase()}
-                  </div>
+                  <span className="text-4xl font-bold text-gray-400">{formData.name[0]}</span>
                 )}
-                <label className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-50 transition cursor-pointer z-10" style={{ pointerEvents: 'auto' }}>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleImageUpload('profilePhoto', e)}
-                    className="hidden"
-                  />
-                  <FaUpload className="text-white" style={{ pointerEvents: 'none' }} />
-                </label>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-gray-600">Upload foto profil Anda</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Basic Info */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Informasi Dasar</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Nama</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name || ''}
-                  onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Role/Spesialisasi</label>
-                <input
-                  type="text"
-                  name="role"
-                  value={formData.role || ''}
-                  onChange={handleInputChange}
-                  placeholder="Contoh: Illustrator Karakter"
-                  className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
-                <select
-                  name="category"
-                  value={formData.category || ''}
-                  onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none"
-                  required
-                >
-                  <option value="">Pilih Kategori</option>
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Bio</label>
-                <textarea
-                  name="bio"
-                  value={formData.bio || ''}
-                  onChange={handleInputChange}
-                  rows="4"
-                  className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="Ceritakan tentang diri Anda..."
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Skills */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Skills</h2>
-            <div className="flex flex-wrap gap-2">
-              {allSkills.map(skill => (
-                <button
-                  key={skill}
-                  type="button"
-                  onClick={() => handleSkillToggle(skill)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                    formData.skills.includes(skill)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {skill}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Portfolio */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Portfolio</h2>
-              <button
-                type="button"
-                onClick={handlePortfolioAdd}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
-              >
-                + Tambah Portfolio
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {formData.portfolio.map((item) => (
-                <div key={item.id} className="border border-gray-200 rounded-xl p-4">
-                  <div className="h-32 bg-gray-200 rounded-lg mb-3 relative overflow-hidden">
-                    {item.image ? (
-                      <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <label className="absolute inset-0 flex items-center justify-center bg-gray-100 cursor-pointer hover:bg-gray-200 transition">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handlePortfolioImageUpload(item.id, e)}
-                          className="hidden"
-                        />
-                        <FaUpload className="text-gray-400 text-2xl" />
-                      </label>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium text-gray-900">{item.title}</p>
-                    <button
-                      type="button"
-                      onClick={() => handlePortfolioDelete(item.id)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      <FaTrash />
-                    </button>
-                  </div>
+                <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 flex items-center justify-center transition">
+                   <FaUpload className="text-white opacity-0 hover:opacity-100" />
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Social Media */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Social Media</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Instagram</label>
-                <input
-                  type="text"
-                  name="social.instagram"
-                  value={formData.social?.instagram || ''}
-                  onChange={handleInputChange}
-                  placeholder="@username"
-                  className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none"
+                <input 
+                  type="file" ref={profilePhotoInputRef} className="hidden" 
+                  accept="image/*" onChange={(e) => handleImageUpload('profilePhoto', e)} 
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Twitter</label>
-                <input
-                  type="text"
-                  name="social.twitter"
-                  value={formData.social?.twitter || ''}
-                  onChange={handleInputChange}
-                  placeholder="@username"
-                  className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Behance</label>
-                <input
-                  type="text"
-                  name="social.behance"
-                  value={formData.social?.behance || ''}
-                  onChange={handleInputChange}
-                  placeholder="username"
-                  className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
+                <h3 className="text-lg font-bold">Foto Profil</h3>
+                <p className="text-sm text-gray-500">Klik lingkaran untuk mengubah foto</p>
               </div>
             </div>
           </div>
 
-          {/* Submit Button */}
-          <div className="flex gap-4">
+          {/* Informasi Dasar */}
+          <div className="bg-white rounded-2xl shadow-md p-6">
+            <h2 className="text-xl font-bold mb-4">Informasi Dasar</h2>
+            <div className="grid gap-4">
+              <input
+                type="text" name="name" value={formData.name} onChange={handleInputChange}
+                placeholder="Nama Lengkap" className="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="text" name="role" value={formData.role} onChange={handleInputChange}
+                placeholder="Role (Contoh: Digital Illustrator)" className="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <select
+                name="category" value={formData.category} onChange={handleInputChange}
+                className="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Pilih Kategori</option>
+                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
+              <textarea
+                name="bio" value={formData.bio} onChange={handleInputChange}
+                placeholder="Bio Singkat" rows="3" className="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Tombol Simpan */}
+          <div className="flex gap-4 pb-10">
             <button
               type="submit"
-              className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition shadow-lg"
+              className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition"
             >
-              Simpan Profil
+              Simpan Perubahan
             </button>
             <button
               type="button"
               onClick={() => navigate('/dashboard')}
-              className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition"
+              className="px-8 py-3 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition"
             >
               Batal
             </button>
@@ -412,4 +225,3 @@ const EditProfile = () => {
 };
 
 export default EditProfile;
-

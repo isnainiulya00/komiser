@@ -19,7 +19,6 @@ export default function Login() {
       localStorage.setItem('user', JSON.stringify(adminData));
       alert("Login berhasil! Selamat datang, Admin");
       navigate('/admin');
-      window.location.reload();
       return;
     }
     
@@ -37,7 +36,6 @@ export default function Login() {
       localStorage.setItem('user', JSON.stringify(userData));
       alert("Login berhasil! Selamat datang, " + user.name);
       navigate('/');
-      window.location.reload();
     } else {
       alert("Email tidak terdaftar. Silakan daftar terlebih dahulu.");
     }
