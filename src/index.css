@@ -1,0 +1,31 @@
+/* 1. Import Font 'Inter' dari Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* 2. Directive Wajib Tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 3. Gaya Global untuk Body */
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif; /* Gunakan font Inter yang sudah di-import */
+  background-color: #f8fafc; /* Set warna background halaman jadi abu-abu terang */
+  color: #1f2937; /* Set warna teks default jadi abu tua */
+  -webkit-font-smoothing: antialiased; /* Membuat font lebih halus di Mac */
+}
+
+/* 4. Kustomisasi Scrollbar (Opsional, agar lebih rapi) */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
